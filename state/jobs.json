@@ -138,7 +138,7 @@
     "https://boards.greenhouse.io/cloudflare/jobs/8238015?gh_jid=8238015": "Senior Customer Engineer SLED TX (Austin, Dallas or Houston) (opens in a new tab) Sales · , Austin, TX · Dallas, TX · Houston, TX Yesterday Date posted: September 30, 2026",
     "https://boards.greenhouse.io/cloudflare/jobs/8238758?gh_jid=8238758": "Digital Customer Engineer (opens in a new tab) Sales · , Kuala Lumpur, Malaysia Today Date posted: October 1, 2026",
     "https://boards.greenhouse.io/cloudflare/jobs/8239175?gh_jid=8239175": "Senior Customer Engineer,Indonesia (opens in a new tab) Sales · , Singapore Today Date posted: October 1, 2026",
-    "https://boards.greenhouse.io/cloudflare/jobs/8239323?gh_jid=8239323": "Senior Product Manager, Product Design (opens in a new tab) Product · , Austin, TX · London, UK Today Date posted: October 1, 2026",
+    "https://boards.greenhouse.io/cloudflare/jobs/8239323?gh_jid=8239323": "Senior Product Manager, Integrity & Trust Experience (opens in a new tab) Product · , Austin, TX · London, UK Today Date posted: October 1, 2026",
     "https://boards.greenhouse.io/cloudflare/jobs/8239834?gh_jid=8239834": "Senior Majors Account Executive - Minnesota (opens in a new tab) Sales · , Minneapolis, MN Yesterday Date posted: September 30, 2026",
     "https://boards.greenhouse.io/cloudflare/jobs/8239900?gh_jid=8239900": "Senior Majors Account Executive - Wisconsin (opens in a new tab) Sales · , Madison, WI Yesterday Date posted: September 30, 2026",
     "https://boards.greenhouse.io/cloudflare/jobs/8241822?gh_jid=8241822": "System Engineer, Behavioral Analysis (opens in a new tab) Engineering · , Austin, TX · New York, NY Yesterday Date posted: September 30, 2026",
@@ -418,6 +418,7 @@
     "https://job-boards.greenhouse.io/gitlab/jobs/8826637002": "Senior Solutions Architect- Sydney",
     "https://job-boards.greenhouse.io/gitlab/jobs/8826920002": "Senior Frontend Engineer",
     "https://job-boards.greenhouse.io/gitlab/jobs/8826965002": "Staff Frontend Engineer",
+    "https://job-boards.greenhouse.io/gitlab/jobs/8827370002": "Staff Data Analyst",
     "https://job-boards.greenhouse.io/gitlab/jobs/8828009002": "Staff Enterprise Architect",
     "https://job-boards.greenhouse.io/gitlab/jobs/8831350002": "Distinguished Engineer, Core DevOps",
     "https://job-boards.greenhouse.io/gitlab/jobs/8838202002": "Senior Developer Advocate",
@@ -435,7 +436,8 @@
     "https://job-boards.greenhouse.io/gitlab/jobs/8857084002": "Manager, Renewals",
     "https://job-boards.greenhouse.io/gitlab/jobs/8857185002": "Associate Renewals Manager",
     "https://job-boards.greenhouse.io/gitlab/jobs/8857335002": "Professional Services Engineer - West",
-    "https://job-boards.greenhouse.io/gitlab/jobs/8857611002": "Associate Renewals Manager, India"
+    "https://job-boards.greenhouse.io/gitlab/jobs/8857611002": "Associate Renewals Manager, India",
+    "https://job-boards.greenhouse.io/gitlab/jobs/8859224002": "Principal Product Marketing Manager, Competitive"
   },
   "Google": {
     "https://google.com/about/careers/applications/jobs/recommendations": "Recommended jobs",
@@ -530,6 +532,8 @@
     "https://careers.ibm.com/en_US/careers/JobDetail?jobId=134219": "Consulting Security Consultant-Data Security Professional Mumbai, IN",
     "https://careers.ibm.com/en_US/careers/JobDetail?jobId=134328": "Data & Analytics Data Engineer-Data Platforms-Databricks Professional Bangalore, IN",
     "https://careers.ibm.com/en_US/careers/JobDetail?jobId=134377": "Software Engineering Data Engineer-Data Platforms-AWS Professional PUNE, IN",
+    "https://careers.ibm.com/en_US/careers/JobDetail?jobId=134455": "Consulting Application Consultant-Site Reliability Professional Bangalore, IN",
+    "https://careers.ibm.com/en_US/careers/JobDetail?jobId=134536": "Research Intern 2027: Quantum Algorithms for Differential Equations Internship Dublin, IE",
     "https://careers.ibm.com/en_US/careers/JobDetail?jobId=134659": "Consulting Développeur Cobol Mainframe expérimenté H/F - IBM FNC Professional Lille, FR",
     "https://careers.ibm.com/en_US/careers/JobDetail?jobId=134753": "Consulting Package Consultant-SAP HANA Billing Professional Bangalore, IN",
     "https://careers.ibm.com/en_US/careers/JobDetail?jobId=134826": "Data & Analytics Data Engineer-Data Integration Professional Bangalore, IN",
