@@ -1,0 +1,54 @@
+name: Career job email alerts
+
+on:
+  schedule:
+    - cron: '2/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      send_test_email:
+        description: 'Send a setup test email before checking jobs'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: career-alerts
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - run: pip install -r requirements.txt
+      - run: python -m playwright install --with-deps chromium
+      - name: Check career portals and send email
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          SMTP_HOST: ${{ vars.SMTP_HOST }}
+          SMTP_PORT: ${{ vars.SMTP_PORT }}
+          SEND_TEST_EMAIL: ${{ inputs.send_test_email }}
+        run: python check_jobs.py
+      - name: Save job history
+        run: |
+          if [ ! -f state/jobs.json ]; then
+            echo 'No portal baseline was created. Review the portal results and scan logs.'
+            exit 1
+          fi
+          git add state/jobs.json
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Update career job baseline'
+            git push
+          fi
