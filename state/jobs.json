@@ -285,6 +285,10 @@
     "https://amazon.jobs/jobs/10571679": "Infra Delivery Install Technician",
     "https://amazon.jobs/jobs/10571692": "Infra-Delivery Install Technician, Infrastructure Delivery",
     "https://amazon.jobs/jobs/10571842": "2027 IT Support Engineering Intern, Amazon Operations Technology Solutions",
+    "https://amazon.jobs/jobs/10572025": "Operations Human Resources Partner Intern (6 Months) - 2027",
+    "https://amazon.jobs/jobs/10572026": "Operations Human Resources Partner Intern (6 Months) - 2027",
+    "https://amazon.jobs/jobs/10572027": "Operations Human Resources Partner Intern (6 Months) - 2027",
+    "https://amazon.jobs/jobs/10572028": "Operations Human Resources Partner Intern (6 Months) - 2027",
     "https://amazon.jobs/jobs/3120598": "Software Development Intern, Intech",
     "https://amazon.jobs/jobs/3122200": "Full-Time Software Development Engineer, São Paulo",
     "https://amazon.jobs/jobs/3139827": "Software Development Engineer Internship - Vaga para mulheres, IES- LATECH",
@@ -544,7 +548,9 @@
     "https://careers.datadoghq.com/detail/8257324?gh_jid=8257324": "Accounts Payable Analyst General & Administrative New York, New York, USA",
     "https://careers.datadoghq.com/detail/8259839?gh_jid=8259839": "Manager I, Engineering - Anomaly Detection Engineering New York, New York, USA",
     "https://careers.datadoghq.com/detail/8260933?gh_jid=8260933": "Manager I, Engineering - Language Platform Engineering Locations",
-    "https://careers.datadoghq.com/detail/8261223?gh_jid=8261223": "Copy of Manager I, Engineering - Language Platform Engineering Lisbon, Portugal"
+    "https://careers.datadoghq.com/detail/8261223?gh_jid=8261223": "Copy of Manager I, Engineering - Language Platform Engineering Lisbon, Portugal",
+    "https://careers.datadoghq.com/detail/8261934?gh_jid=8261934": "Staff Research Scientist - Post-Training for Agents Engineering Locations",
+    "https://careers.datadoghq.com/detail/8261937?gh_jid=8261937": "Staff Research Scientist - Foundation & World Models Engineering Locations"
   },
   "Docker": {
     "https://docker.com/careers/hiring-onboarding": "Hiring & Onboarding",
@@ -652,6 +658,7 @@
     "https://job-boards.greenhouse.io/gitlab/jobs/8687926002": "Backend Engineer, Create: Source Code Experience (Ruby)",
     "https://job-boards.greenhouse.io/gitlab/jobs/8688078002": "Intermediate Software Engineer, Security Factory: Vulnerability Management",
     "https://job-boards.greenhouse.io/gitlab/jobs/8689236002": "Staff Backend Engineer, Core DevOps",
+    "https://job-boards.greenhouse.io/gitlab/jobs/8689243002": "Senior Backend Engineer, Core DevOps",
     "https://job-boards.greenhouse.io/gitlab/jobs/8691382002": "Strategic Account Executive - San Francisco",
     "https://job-boards.greenhouse.io/gitlab/jobs/8691770002": "Staff Professional Services Operations Manager",
     "https://job-boards.greenhouse.io/gitlab/jobs/8692874002": "Senior Support Engineer",
@@ -797,6 +804,7 @@
     "https://job-boards.greenhouse.io/gitlab/jobs/8860287002": "Major Account Executive, France",
     "https://job-boards.greenhouse.io/gitlab/jobs/8860302002": "Account Executive - France",
     "https://job-boards.greenhouse.io/gitlab/jobs/8861795002": "Manager, Assigned Support Engineering (EMEA)",
+    "https://job-boards.greenhouse.io/gitlab/jobs/8862046002": "Senior Director, Global SME Solutions Architecture",
     "https://job-boards.greenhouse.io/gitlab/jobs/8864903002": "Pipeline Programs Manager",
     "https://job-boards.greenhouse.io/gitlab/jobs/8867725002": "Senior Backend Engineer (Ruby), Production Engineering:Tenant Controls",
     "https://job-boards.greenhouse.io/gitlab/jobs/8868220002": "Strategic Account Executive, France",
@@ -1166,6 +1174,7 @@
     "https://careers.nutanix.com/en/jobs/32790/systems-sales-engineer": "Systems Sales Engineer",
     "https://careers.nutanix.com/en/jobs/32791/member-of-technical-staff-2": "Member of Technical Staff 2",
     "https://careers.nutanix.com/en/jobs/32793/financial-analyst": "Financial Analyst",
+    "https://careers.nutanix.com/en/jobs/32794/commercial-account-manager-charlotte-nc": "Commercial Account Manager - Charlotte, NC",
     "https://careers.nutanix.com/en/jobs/32795/mts-2-backend-developer-plusgolangpluslinuxplussystemsideplusgrpc-and-api-rest": "MTS 2 (Backend Developer +Golang+Linux+SystemSide+GRPC and API REST)",
     "https://careers.nutanix.com/en/jobs/32796/director-people-business-partners": "Director, People Business Partners",
     "https://careers.nutanix.com/en/jobs/32800/project-manager": "Project Manager",
@@ -1220,7 +1229,7 @@
     "https://job-boards.greenhouse.io/tailscale/jobs/4715148005": "Customer Reliability Engineer Remote (Canada)",
     "https://job-boards.greenhouse.io/tailscale/jobs/4715160005": "Customer Reliability Engineer Remote (United States)",
     "https://job-boards.greenhouse.io/tailscale/jobs/4715169005": "Customer Account Executive Hybrid (Denver, Colorado, United States)",
-    "https://job-boards.greenhouse.io/tailscale/jobs/4715835005": "Solutions Engineer - Commercial (Expansion Sales) Remote (Canada)",
+    "https://job-boards.greenhouse.io/tailscale/jobs/4715835005": "Solutions Engineer - Commercial (Expansion Sales) Remote (Canada) Full-time",
     "https://job-boards.greenhouse.io/tailscale/jobs/4715836005": "Solutions Engineer - Commercial (Expansion Sales) Remote (United States) Full-time",
     "https://job-boards.greenhouse.io/tailscale/jobs/4716226005": "Customer Reliability Engineer Remote (United Kingdom)",
     "https://job-boards.greenhouse.io/tailscale/jobs/4717966005": "Sales Development Representative (Outbound) Hybrid (Vancouver, British Columbia)",
@@ -1273,6 +1282,7 @@
     "https://job-boards.greenhouse.io/tailscale/jobs/4739774005": "Senior Customer Account ExecutiveNew Hybrid (San Francisco, California, United States)",
     "https://job-boards.greenhouse.io/tailscale/jobs/4740468005": "Customer Account Executive New Hybrid (Vancouver, British Columbia)",
     "https://job-boards.greenhouse.io/tailscale/jobs/4740660005": "Senior New Business Account ExecutiveNew Hybrid (Toronto, Ontario)",
-    "https://job-boards.greenhouse.io/tailscale/jobs/4740663005": "Senior New Business Account Executive Hybrid (Vancouver, British Columbia) Full-time"
+    "https://job-boards.greenhouse.io/tailscale/jobs/4740663005": "Senior New Business Account Executive Hybrid (Vancouver, British Columbia) Full-time",
+    "https://job-boards.greenhouse.io/tailscale/jobs/4741470005": "Senior Solutions Engineer, EnterpriseNew Remote (United States)"
   }
 }
