@@ -9,6 +9,7 @@ from pathlib import Path
 KEYWORDS = json.loads((Path(__file__).parent / "filters.json").read_text())["keywords"]
 
 
+
 class TextParser(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -33,7 +34,9 @@ def matched_keywords(description):
 
 def geography(location, description):
     # Use job location fields, not India mentioned among a company's offices.
-    if (re.search(r"\bIndia\b", location, re.I) or location.strip().upper() == "IN") and not re.search(r"\b(?:excluding|except|outside|not)\b", location, re.I):
+    # Country codes occur inside flattened address fields, e.g. Bengaluru, KA,IN, IN.
+    india_code = re.search(r"(?:^|[,;|])\s*IN\s*(?=[,;|]|$)", location)
+    if (re.search(r"\bIndia\b", location, re.I) or india_code) and not re.search(r"\b(?:excluding|except|outside|not)\b", location, re.I):
         return "India"
     global_location = re.search(
         r"\b(worldwide|global|anywhere in the world|work from anywhere)\b", location, re.I)
@@ -71,6 +74,8 @@ def address_text(value):
         value = dict(value)
         if value.get("addressCountry") == "IN":
             value["addressCountry"] = "India"
+        if value.get("@type") == "Country" and value.get("name") == "IN":
+            value["name"] = "India"
         return ", ".join(address_text(value[key]) for key in
                          ("name", "addressLocality", "addressRegion", "addressCountry") if key in value)
     return str(value or "")
@@ -114,7 +119,8 @@ DETAIL_SCRIPT = """() => {
    description: text(['[itemprop="description"]', '[data-automation-id="jobPostingDescription"]',
      '.job-description', '.jobDescription', '#job-description', '#jobDescription',
      '.job-description-content', '[data-testid="job-description"]', '.posting-page .content',
-     '#content .content', '.job-details-description']),
+     '#content .content', '.job-details-description', '#description',
+     '.job-description-container', '.job-detail .description', '.job .description']),
    location: text(['[itemprop="jobLocation"]', '[data-automation-id="locations"]',
      '[data-automation-id="location"]', '.job-location', '.jobLocation', '.location'])
  };
@@ -131,7 +137,14 @@ async def read_details(browser, job):
         if not response or response.status >= 400:
             raise RuntimeError(f"detail page HTTP {response.status if response else 'none'}")
         for attempt in range(5):
-            payload = await page.evaluate(DETAIL_SCRIPT)
+            try:
+                payload = await page.evaluate(DETAIL_SCRIPT)
+            except Exception as exc:
+                if attempt == 4 or not any(message in str(exc).lower() for message in
+                                          ("execution context was destroyed", "cannot find context")):
+                    raise
+                await page.wait_for_timeout(1000)
+                continue
             description, location = structured_details(payload["documents"])
             description = description or payload["description"]
             location = location or payload["location"]
@@ -143,9 +156,15 @@ async def read_details(browser, job):
         await context.close()
 
 
-async def filter_changes(browser, candidates, updated, logger):
+
+async def filter_changes(browser, candidates, updated, logger, reports=None):
     import asyncio
     semaphore = asyncio.Semaphore(4)
+
+    if reports is None:
+        reports = {}
+    for company, jobs in candidates.items():
+        reports[company] = {"candidates": len(jobs), "matched": 0, "skipped": 0, "pending": 0}
 
     async def check(company, job):
         async with semaphore:
@@ -154,11 +173,14 @@ async def filter_changes(browser, candidates, updated, logger):
                 words = matched_keywords(detail.description)
                 region = geography(detail.location, detail.description)
                 if words and region:
+                    reports[company]["matched"] += 1
                     return company, replace(detail, matched=words, eligibility=region)
+                reports[company]["skipped"] += 1
                 logger.info("%s: skipped %s (location=%r, keyword matches=%s)",
                             company, job.url, detail.location, ", ".join(words) or "none")
             except Exception as exc:
                 # Failed detail reads stay unseen so a later run can retry.
+                reports[company]["pending"] += 1
                 updated[company].pop(job.url, None)
                 logger.warning("%s: details pending for %s: %s", company, job.url, exc)
             return company, None

@@ -17,6 +17,8 @@ from pathlib import Path
 from hashlib import sha256
 from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 from job_filters import filter_changes, plain_text
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent
 STATE = ROOT / "state" / "jobs.json"
@@ -262,7 +264,7 @@ async def scan(browser, company: str, portal: str) -> tuple[str, dict[str, Job] 
         await context.close()
 
 
-def send_email(changes: dict[str, list[Job]], subject: str | None = None) -> None:
+def send_email(changes: dict[str, list[Job]], subject: str | None = None, report_body: str | None = None) -> None:
     user = os.environ.get("SMTP_USER")
     password = os.environ.get("SMTP_PASSWORD")
     recipient = os.environ.get("ALERT_EMAIL")
@@ -281,7 +283,7 @@ def send_email(changes: dict[str, list[Job]], subject: str | None = None) -> Non
     )
     if subject is None:
         body = "These job links were newly detected by your monitor. Their original posting dates may be earlier.\n\n" + body
-    msg.set_content(body)
+    msg.set_content(report_body if report_body is not None else body)
     host = os.getenv("SMTP_HOST") or "smtp.gmail.com"
     port = int(os.getenv("SMTP_PORT") or "465")
     with smtplib.SMTP_SSL(host, port, timeout=30, context=ssl.create_default_context()) as smtp:
@@ -296,6 +298,58 @@ def load_state() -> dict[str, dict[str, str]]:
     if not isinstance(data, dict):
         raise ValueError("Invalid job state")
     return data
+
+
+def company_report(company, jobs, previous, reports):
+    if jobs is None:
+        return "CHECK FAILED: portal could not be read; new-job status unknown."
+    if not jobs:
+        return "CHECK INCOMPLETE: no job links extracted; new-job status unknown."
+    if company not in previous or previous.get(META, {}).get(company) != source_version(company):
+        return f"BASELINE SAVED: {len(jobs)} existing links recorded; alerts start on later checks."
+    report = reports.get(company, {})
+    matched = report.get("matched", 0)
+    pending = report.get("pending", 0)
+    if matched:
+        text = f"{matched} new job(s) match your criteria; {len(jobs)} links detected."
+    elif pending:
+        text = f"No matching new job confirmed yet; {len(jobs)} links detected."
+    else:
+        text = f"No new job matching your required criteria detected; {len(jobs)} links detected."
+    if pending:
+        text += f" {pending} description check(s) pending; these will be retried."
+    return text
+
+
+def build_run_report(results, previous, changes, reports):
+    count = sum(map(len, changes.values()))
+    issues = sum(not jobs for _, jobs in results) + sum(r.get("pending", 0) for r in reports.values())
+    outcome = "some checks incomplete" if issues else "portal scans completed"
+    subject = f"Career check: {count} matching new jobs — {outcome}"
+    checked = datetime.now(timezone.utc).astimezone(
+        ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %I:%M %p IST")
+    lines = [f"Your career-check script completed its scanning and filtering steps at {checked}.",
+             "This message reports the check even when there are no matching new jobs.",
+             "Criteria: India or explicitly worldwide work AND any configured keyword in the description (case-insensitive).",
+             "", "COMPANY RESULTS", ""]
+    for company, jobs in results:
+        lines.append(f"{company}: {company_report(company, jobs, previous, reports)}")
+        lines.append(f"Portal: {PORTALS.get(company, '')}")
+        for job in changes.get(company, []):
+            lines.extend([f"  Job: {job.title}", f"  Location: {job.location or job.eligibility}",
+                          f"  Matched keywords: {', '.join(job.matched)}", f"  Link: {job.url}"])
+        lines.append("")
+    lines.extend(["Coverage is limited to links the scanner can extract; counts do not confirm all company vacancies.",
+                  "New means newly detected after baseline, not a verified publication date.",
+                  "Unreadable portals and pending descriptions cannot confirm absence of matching jobs.",
+                  "Job history is saved by the next workflow step; this email does not confirm that step succeeded."])
+    return subject, "\n".join(lines)
+
+
+def send_run_email(results, previous, changes, reports):
+    subject, body = build_run_report(results, previous, changes, reports)
+    # Reuse the existing SMTP configuration; the report is sent on every completed check.
+    send_email({}, subject=subject, report_body=body)
 
 
 def process(results: list[tuple[str, dict[str, Job] | None]], previous: dict) -> tuple[dict, dict[str, list[Job]]]:
@@ -363,18 +417,19 @@ async def main() -> None:
         try:
             results = await asyncio.gather(*(limited(c, u) for c, u in PORTALS.items()))
             updated, candidates = process(results, previous)
-            changes = await filter_changes(browser, candidates, updated, LOG)
+            reports = {}
+            changes = await filter_changes(browser, candidates, updated, LOG, reports)
         finally:
             await browser.close()
     # Mail first: on SMTP failure the baseline stays old, so a retry is possible.
-    if changes:
-        send_email(changes)
+    send_run_email(results, previous, changes, reports)
     if updated != previous:
         STATE.parent.mkdir(parents=True, exist_ok=True)
         temp = STATE.with_suffix(".tmp")
         temp.write_text(json.dumps(updated, indent=2, ensure_ascii=False, sort_keys=True) + "\n")
         temp.replace(STATE)
     write_summary(results, previous, changes)
+    LOG.info("Check report accepted by the SMTP server")
 
 
 if __name__ == "__main__":

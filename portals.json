@@ -1,7 +1,7 @@
 {
   "GitLab": "https://about.gitlab.com/jobs/all-jobs/",
   "Automattic": "https://automattic.com/work-with-us/jobs/",
-  "Canonical": "https://canonical.com/careers/all",
+  "Canonical": "https://canonical.com/careers",
   "Red Hat": "https://www.redhat.com/en/jobs",
   "SUSE": "https://suse.wd3.myworkdayjobs.com/en-US/Jobsatsuse",
   "Cloudflare": "https://www.cloudflare.com/careers/jobs/",
@@ -27,6 +27,6 @@
   "NetApp": "https://careers.netapp.com/",
   "Cloud Software Group / Citrix": "https://careers.cloud.com/",
   "Veeam": "https://careers.veeam.com/search-jobs",
-  "Akamai": "https://jobs.akamai.com/",
+  "Akamai": "https://jobs.akamai.com/en/sites/CX_1",
   "CrowdStrike": "https://www.crowdstrike.com/careers/"
 }
