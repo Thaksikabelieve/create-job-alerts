@@ -14,7 +14,9 @@ import ssl
 from dataclasses import dataclass
 from email.message import EmailMessage
 from pathlib import Path
+from hashlib import sha256
 from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
+from job_filters import filter_changes, plain_text
 
 ROOT = Path(__file__).resolve().parent
 STATE = ROOT / "state" / "jobs.json"
@@ -22,6 +24,8 @@ PORTALS = json.loads((ROOT / "portals.json").read_text())
 LOG = logging.getLogger("career-alerts")
 MAX_PAGES = 4  # per company, including landing page
 PARALLEL = 5
+SCANNER_VERSION = "2"
+META = "__source_versions__"
 TRACKING = re.compile(r"^(utm_|ref$|source$|src$|gh_src$|lang$|locale$)", re.I)
 BOARD_HOSTS = (
     "greenhouse.io", "lever.co", "ashbyhq.com", "myworkdayjobs.com",
@@ -33,7 +37,7 @@ JOB_PATHS = [
     re.compile(p, re.I) for p in (
         r"/jobs?/(?:[a-z]{2}/)?(?:\d{3,}(?:[-/][^/?]+)?|[a-f0-9-]{12,})(?:/|$)",
         r"/(?:careers|positions|openings)/jobs?/[^/?]+/[^/?]+",
-        r"/(?:careers|job|jobs|positions|openings)/(?:[a-z0-9-]*\d+[a-z0-9-]*|[a-z][a-z0-9-]{12,})(?:/|$)",
+        r"/(?:careers|job|jobs|positions|openings)/[a-z0-9-]*\d+[a-z0-9-]*(?:/|$)",
         r"/job/[^/?]+/[^/?]+",  # e.g., Workday and IBM
         r"/applications/jobs/results/\d+[-/]",
         r"/en/jobs/\d+",  # Amazon
@@ -43,16 +47,28 @@ JOB_PATHS = [
         r"/detail/\d+",  # Datadog
         r"/work-with-us/job/[^/?]+",  # Automattic
         r"/sites/jobsearch/job/\d+",  # Oracle
+        r"/jobs/ProjectDetail/[^/?]+/\d+",  # Older Cisco listings
+        r"/careers/JobDetail/[^/?]+/\d+",  # IBM
+        r"/careerhub/explore/jobs/\d+",  # Microsoft
     )
 ]
 PAGE_CUE = re.compile(r"\b(jobs?|roles?|positions?|openings?|vacancies|opportunities|search|view all|join our team)\b", re.I)
-EXCLUDE = re.compile(r"(privacy|terms|cookie|salary|benefits|talent.community|internship.program|job.alert|login|sign.in)", re.I)
+EXCLUDE = re.compile(r"(privacy|terms|cookie|salary|benefits|talent.community|internship.program|job[-_ ]?alerts?|login|sign.in|introduceYourself|\.(?:pdf|zip|png|jpg|svg)$)", re.I)
+JOB_ID_KEYS = {"gh_jid", "jobid", "job_id", "job", "reqid", "requisitionid", "jid", "pid", "domain"}
+
+
+def source_version(company):
+    return sha256((SCANNER_VERSION + PORTALS.get(company, "")).encode()).hexdigest()[:16]
 
 
 @dataclass(frozen=True)
 class Job:
     url: str
     title: str
+    description: str = ""
+    location: str = ""
+    matched: tuple[str, ...] = ()
+    eligibility: str = ""
 
 
 def normalized(url: str) -> str:
@@ -73,6 +89,10 @@ def is_job(url: str) -> bool:
         return True
     host = (parts.hostname or "").lower()
     params = dict(parse_qsl(parts.query))
+    if any(k.lower() == "gh_jid" and v.isdigit() for k, v in params.items()):
+        return True
+    if host.endswith("pulumi.com") and re.fullmatch(r"/careers/[a-z][a-z0-9-]{10,}", path):
+        return True
     if re.search(r"/(?:jobdetails|job-detail|job-search|job)", path, re.I) and any(
         re.fullmatch(r"(?:job|jobid|job_id|jobidof|requisitionid|reqid)", key, re.I)
         and len(value) >= 4 for key, value in params.items()
@@ -89,9 +109,17 @@ def is_job(url: str) -> bool:
     return False
 
 
+def canonical_job_url(url):
+    parts = urlsplit(normalized(url))
+    # Retain requisition identifiers, discard changing search/tracking parameters.
+    query = urlencode(sorted((k, v) for k, v in parse_qsl(parts.query) if k.lower() in JOB_ID_KEYS))
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, query, ""))
+
+
 def allowed(url: str, original: str) -> bool:
     host = (urlsplit(url).hostname or "").lower().removeprefix("www.")
-    parent = (urlsplit(original).hostname or "").lower().removeprefix("www.")
+    original_host = (urlsplit(original).hostname or "").lower().removeprefix("www.")
+    parent = ".".join(original_host.split(".")[-2:])
     # Links on the official site may point at its own pages or recognized ATS providers.
     return host == parent or host.endswith("." + parent) or any(
         host == name or host.endswith("." + name) for name in BOARD_HOSTS
@@ -107,11 +135,46 @@ def record(links: list[dict], page_url: str, portal: str) -> tuple[dict[str, Job
         if not url or not allowed(url, portal):
             continue
         if is_job(url):
+            url = canonical_job_url(url)
             jobs[url] = Job(url, title or "Job posting")
         elif PAGE_CUE.search(title + " " + urlsplit(url).path) and not EXCLUDE.search(url):
-            priority = 0 if re.search(r"all.jobs|job.openings|search.jobs|open.positions|view.jobs", title + " " + url, re.I) else 1
+            priority = 0 if re.search(r"all.jobs|job.openings|search.jobs|open.positions|view.jobs|search-results", title + " " + url, re.I) else 1
             pages.append((priority, url))
     return jobs, [url for _, url in sorted(pages)]
+
+
+def greenhouse_token(url):
+    parts = urlsplit(url)
+    if parts.hostname not in ("boards.greenhouse.io", "job-boards.greenhouse.io", "job-boards.eu.greenhouse.io"):
+        return None
+    bits = parts.path.strip("/").split("/")
+    token = dict(parse_qsl(parts.query)).get("for") if bits[0] == "embed" else bits[0]
+    return token if token and re.fullmatch(r"[a-zA-Z0-9_-]+", token) else None
+
+
+async def greenhouse_jobs(context, token, company):
+    try:
+        response = await context.request.get(
+            f"https://boards-api.greenhouse.io/v1/boards/{token}/jobs?content=true", timeout=15000)
+        if not response.ok:
+            LOG.warning("%s: job-board feed HTTP %s", company, response.status)
+            return {}
+        data = await response.json()
+        if not isinstance(data.get("jobs"), list):
+            return {}
+        jobs = {}
+        for item in data["jobs"]:
+            if not item.get("internal_job_id") or not item.get("absolute_url"):
+                continue  # Do not alert on talent-pool prospect posts.
+            url = canonical_job_url(item["absolute_url"])
+            location = (item.get("location") or {}).get("name", "")
+            jobs[url] = Job(url, item.get("title", "Job posting") + (f" ({location})" if location else ""),
+                            plain_text(item.get("content")), location)
+        LOG.info("%s: official Greenhouse feed returned %d jobs", company, len(jobs))
+        return jobs
+    except Exception as exc:
+        LOG.warning("%s: job-board feed: %s", company, exc)
+        return {}
 
 
 async def scan(browser, company: str, portal: str) -> tuple[str, dict[str, Job] | None]:
@@ -124,6 +187,8 @@ async def scan(browser, company: str, portal: str) -> tuple[str, dict[str, Job] 
     visited = set()
     found: dict[str, Job] = {}
     succeeded = False
+    checked_feeds = set()
+    successful_feeds = set()
     try:
         while queue and len(visited) < MAX_PAGES:
             target = queue.pop(0)
@@ -131,21 +196,61 @@ async def scan(browser, company: str, portal: str) -> tuple[str, dict[str, Job] 
                 continue
             visited.add(target)
             try:
+                token = greenhouse_token(target)
+                if token and token not in checked_feeds:
+                    checked_feeds.add(token)
+                    feed = await greenhouse_jobs(context, token, company)
+                    if feed:
+                        successful_feeds.add(token)
+                        found.update(feed)
+                        succeeded = True
+                        continue
                 response = await page.goto(target, wait_until="domcontentloaded", timeout=20000)
                 if not response or response.status >= 400:
                     LOG.warning("%s: HTTP %s at %s", company, response.status if response else "none", target)
                     continue
-                await page.wait_for_timeout(1500)
-                # Some ATS listings lazily load only after the first scroll.
-                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                await page.wait_for_timeout(1000)
-                links = await page.locator("a[href]").evaluate_all(
-                    "els => els.map(a => ({href: a.href, text: a.innerText || a.getAttribute('aria-label') || ''}))"
-                )
+                links = []
+                last_count = -1
+                stable = 0
+                # Wait for dynamic listings instead of relying on one fixed delay.
+                for attempt in range(8):
+                    await page.wait_for_timeout(1000)
+                    try:
+                        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                        links = []
+                        for frame in page.frames:
+                            if allowed(frame.url, portal):
+                                links.extend(await frame.locator("a[href]").evaluate_all(
+                                    "els => els.map(a => ({href: a.href, text: a.innerText || a.getAttribute('aria-label') || ''}))"
+                                ))
+                        links.extend(await page.locator("iframe[src]").evaluate_all(
+                            "els => els.map(e => ({href:e.src, text:'Open jobs'}))"
+                        ))
+                        jobs, _ = record(links, page.url, portal)
+                        stable = stable + 1 if jobs and len(jobs) == last_count else 0
+                        last_count = len(jobs)
+                        if stable >= 2:
+                            break
+                    except Exception:
+                        if attempt == 7:
+                            raise
                 jobs, pages = record(links, page.url, portal)
                 found.update(jobs)
                 succeeded = True
+                for link in links:
+                    url = urljoin(page.url, link.get("href") or "")
+                    token = greenhouse_token(url) if allowed(url, portal) else None
+                    if token and token not in checked_feeds:
+                        checked_feeds.add(token)
+                        feed = await greenhouse_jobs(context, token, company)
+                        found.update(feed)
+                        if feed:
+                            successful_feeds.add(token)
                 for child in pages:
+                    if greenhouse_token(child) in successful_feeds:
+                        continue
+                    if company == "HashiCorp" and dict(parse_qsl(urlsplit(child).query)).get("q", "").lower() != "hashicorp":
+                        continue
                     if child not in visited and child not in queue and len(queue) < 15:
                         queue.append(child)
             except Exception as exc:
@@ -166,11 +271,17 @@ def send_email(changes: dict[str, list[Job]], subject: str | None = None) -> Non
     msg = EmailMessage()
     msg["From"] = user
     msg["To"] = recipient
-    msg["Subject"] = subject or f"New jobs: {sum(map(len, changes.values()))} across {len(changes)} companies"
-    msg.set_content("\n\n".join(
-        company + "\n" + "\n".join(f"- {job.title}: {job.url}" for job in jobs)
+    msg["Subject"] = subject or f"Career alerts: {sum(map(len, changes.values()))} newly detected jobs"
+    body = "\n\n".join(
+        company + "\n" + "\n".join(
+            f"- {job.title}: {job.url}" +
+            (f"\n  Location: {job.location or job.eligibility}; eligible: {job.eligibility}"
+             f"\n  Keywords: {', '.join(job.matched)}" if job.matched else "") for job in jobs)
         for company, jobs in sorted(changes.items())
-    ))
+    )
+    if subject is None:
+        body = "These job links were newly detected by your monitor. Their original posting dates may be earlier.\n\n" + body
+    msg.set_content(body)
     host = os.getenv("SMTP_HOST") or "smtp.gmail.com"
     port = int(os.getenv("SMTP_PORT") or "465")
     with smtplib.SMTP_SSL(host, port, timeout=30, context=ssl.create_default_context()) as smtp:
@@ -189,18 +300,22 @@ def load_state() -> dict[str, dict[str, str]]:
 
 def process(results: list[tuple[str, dict[str, Job] | None]], previous: dict) -> tuple[dict, dict[str, list[Job]]]:
     updated = {name: dict(jobs) for name, jobs in previous.items()}
+    versions = dict(previous.get(META, {}))
     changes: dict[str, list[Job]] = {}
     for company, jobs in results:
         if jobs is None or not jobs:
             LOG.warning("%s: no jobs found; retaining old baseline", company)
             continue
-        if company in previous:
-            new = [job for url, job in jobs.items() if url not in previous[company]]
+        old_jobs = {canonical_job_url(url): title for url, title in previous.get(company, {}).items()}
+        if company in previous and versions.get(company) == source_version(company):
+            new = [job for url, job in jobs.items() if url not in old_jobs]
             if new:
                 changes[company] = new
         else:
-            LOG.info("%s: initial baseline of %d jobs (no email)", company, len(jobs))
-        updated[company] = {**updated.get(company, {}), **{url: job.title for url, job in jobs.items()}}
+            LOG.info("%s: initial or updated-source baseline of %d jobs (no email)", company, len(jobs))
+        updated[company] = {**old_jobs, **{url: job.title for url, job in jobs.items()}}
+        versions[company] = source_version(company)
+        updated[META] = versions
         LOG.info("%s: found %d jobs, %d new", company, len(jobs), len(changes.get(company, [])))
     return updated, changes
 
@@ -215,10 +330,10 @@ def write_summary(results, previous, changes):
             status = "Could not read portal; check logs"
         elif not jobs:
             status = "No job links detected; check layout or access"
-        elif company not in previous:
-            status = "First baseline saved; existing jobs not emailed"
+        elif company not in previous or previous.get(META, {}).get(company) != source_version(company):
+            status = "Initial or updated-source baseline saved; existing jobs not emailed"
         else:
-            status = f"{len(changes.get(company, []))} new links found"
+            status = f"{len(changes.get(company, []))} new jobs match India/worldwide and keyword filters"
         rows.append(f"| {company} | {len(jobs or {})} | {status} |")
     rows.extend(["", "Detected links do not confirm complete coverage. Review failed and empty scans.", ""])
     with open(path, "a") as summary:
@@ -228,8 +343,12 @@ def write_summary(results, previous, changes):
 async def main() -> None:
     from playwright.async_api import async_playwright
 
-    if not all(os.getenv(key) for key in ("SMTP_USER", "SMTP_PASSWORD", "ALERT_EMAIL")):
-        raise RuntimeError("Configure SMTP_USER, SMTP_PASSWORD and ALERT_EMAIL as repository secrets")
+    missing = [
+        name for name in ("SMTP_USER", "SMTP_PASSWORD", "ALERT_EMAIL")
+        if not os.getenv(name, "").strip()
+    ]
+    if missing:
+        raise RuntimeError("Missing or empty repository secrets: " + ", ".join(missing))
     if os.getenv("SEND_TEST_EMAIL", "").lower() == "true":
         send_email({"Setup test": [Job("https://github.com/", "Your email connection works. This is a setup test, not a new job alert.")]},
                    subject="Career alerts: test email")
@@ -243,9 +362,10 @@ async def main() -> None:
                 return await scan(browser, company, portal)
         try:
             results = await asyncio.gather(*(limited(c, u) for c, u in PORTALS.items()))
+            updated, candidates = process(results, previous)
+            changes = await filter_changes(browser, candidates, updated, LOG)
         finally:
             await browser.close()
-    updated, changes = process(results, previous)
     # Mail first: on SMTP failure the baseline stays old, so a retry is possible.
     if changes:
         send_email(changes)
